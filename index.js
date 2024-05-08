@@ -1,7 +1,7 @@
 const DatabaseManager = require('./DatabaseManager');
 
 async function main() {
-    const db = new DatabaseManager('mongodb://localhost:27017', 'cine');
+    const db = new DatabaseManager('mongodb://localhost:27017', 'NETFLIXDB');
     await db.connect();
   
     // Insertar un documento
@@ -9,7 +9,10 @@ async function main() {
   
     // Obtener documentos
     const docs = await db.find('peliculas');
+    const docs2 = await db.find('ususarios');
     console.log('Documentos:', docs);
+    console.log('Documentos:', docs2);
+
   
     await db.close();
 }
