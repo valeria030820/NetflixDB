@@ -1,115 +1,129 @@
 const DatabaseManager = require('./DatabaseManager');
-
-async function main() {
-    const db = new DatabaseManager('mongodb://localhost:27017', 'NETFLIXDB');
-    await db.connect();
-  
-    // Insertar un documento
-    //await db.insert('mi_coleccion', { nombre: 'Juan', edad: 30 });
-  
-    // Obtener documentos
-    const docs = await db.find('peliculas');
-    const docs2 = await db.find('ususarios');
-    console.log('Documentos:', docs);
-    console.log('Documentos:', docs2);
-
-  
-    await db.close();
-}
-  
-main();
-
-
-/*const DatabaseManager = require('./DatabaseManager');
-const PeliculasManager = require('./PeliculasManager');
-const UsuariosManager = require('./UsuariosManager');
+const readline = require('readline');
 
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
 
-const connectionString = 'mongodb://localhost:27017'; 
-const databaseName = 'NetflixDB';
+function question(prompt) {
+    return new Promise((resolve) => {
+        rl.question(prompt, (answer) => {
+            resolve(answer);
+        });
+    });
+}
 
-const dbManager = new DatabaseManager(connectionString, databaseName);
+async function mostrarPeliculas(db) {
+    const peliculas = await db.find('peliculas', {});
+    console.log('Peliculas:', peliculas);
+}
 
-function mostrarMenu() {
-    console.log('\nBienvenido al sistema de gestión de películas de Netflix:');
-    console.log('1. Ver todas las películas');
-    console.log('2. Ver todos los usuarios');
-    console.log('3. Agregar nueva película');
-    console.log('4. Agregar nuevo usuario');
-    console.log('5. Salir');
+async function añadirFavoritos(db, user) {
+    const pelicula = await question('Ingresa el nombre de la pelicula ');
+    peli = await db.find('peliculas', {nombre: pelicula})
+    if(peli.length > 0) {
+        const favorite = peli[0];
+        const pelicula_ids = user.pelicula_ids;
+        pelicula_ids.push(favorite._id);
+        db.update('usuarios', {nombre: user.nombre}, {pelicula_ids: pelicula_ids})
+        console.log('Película añadida a favoritos');
+    } else {
+        console.log('Pelicula no encontrada');
+    }
+}
 
-    rl.question('Por favor, seleccione una opción: ', (opcion) => {
+async function mostrarFavoritos(db, user) {
+    const peliculas = await db.find('peliculas', {_id: {$in: user.pelicula_ids}});
+    console.log('Peliculas favoritas:', peliculas);
+}
+
+async function agregarPelicula(db) {
+    const nombre = await question('Ingresa el nombre de la pelicula: ');
+    const genero = await question('Ingresa el genero de la pelicula: ');
+    var duracion = await question('Ingresa la duracion de la pelicula: ');
+    duracion = parseInt(duracion);
+    const director = await question('Ingresa el director de la pelicula: ');
+    const sinopsis = await question('Ingresa la sinopsis de la pelicula: ');
+    const data = {nombre, genero, duracion, director, sinopsis};
+    await db.insert('peliculas', data);
+    console.log('Pelicula añadida');
+}
+
+async function mostrarMenu(db, user) {
+    let opcion = '';
+    while(true) {
+        console.log(`\nBienvenido al sistema de gestión de películas de Netflix: ${user.nombre}`);
+        console.log('1. Ver todas las películas');
+        console.log('2. Añadir película a favoritos');
+        console.log('3. Ver mis películas favoritas');
+        console.log('4. Agregar nueva película');
+        console.log('5. Salir');
+
+        opcion = await question('Por favor, seleccione una opción: ');
+
         switch (opcion) {
             case '1':
-                mostrarTodasPeliculas().then(mostrarMenu).catch(console.error);
+                await mostrarPeliculas(db);
                 break;
             case '2':
-                mostrarTodosUsuarios().then(mostrarMenu).catch(console.error);
-                break;
+                await añadirFavoritos(db, user);
+                break
             case '3':
-                agregarNuevaPelicula();
+                await mostrarFavoritos(db, user);
                 break;
             case '4':
-                agregarNuevoUsuario();
+                await agregarPelicula(db);
                 break;
             case '5':
                 console.log('Saliendo del programa...');
-                rl.close();
+                process.exit();
                 break;
             default:
                 console.log('Opción inválida');
-                mostrarMenu();
                 break;
         }
-    });
+
+        await question('Pulse una enter para continuar');
+    }
 }
 
-function mostrarTodasPeliculas() {
-    return peliculasManager.obtenerTodasPeliculas()
-        .then(peliculas => {
-            console.log('Películas:', peliculas);
-        });
+
+async function main() {
+
+    //Conexión a la db
+    const db = new DatabaseManager('mongodb://localhost:27017', 'NETFLIXDB');
+    await db.connect();
+
+    //usuario
+    var user;
+
+    //Mientras esté vacío el usuario hace un inicio de sesión
+    while(!user){
+        //Pide al usuario los datos
+        const usuario = await question('Ingrese su correo: ');
+        const u = await db.find('usuarios', {correo: usuario});
+        //Si existe el correo
+        if(u.length > 0) {
+            //Pide la contraseña
+            const pass = await question('Ingrese su contraseña: ');
+            const uc = await db.find('usuarios', {correo: usuario, contraseña: pass});
+            if(uc.length > 0) {
+                user = u[0];
+            }
+            else{
+                console.log('Contraseña incorrecta');
+            }
+        }
+        else{
+            console.log('Usuario no encontrado');
+        }
+    }
+
+    await mostrarMenu(db, user);
+
+    await db.close();
 }
 
-function mostrarTodosUsuarios() {
-    return usuariosManager.obtenerTodosUsuarios()
-        .then(usuarios => {
-            console.log('Usuarios:', usuarios);
-        });
-}
-
-function agregarNuevaPelicula() {
-    // Simulamos el proceso de agregación
-    console.log('Agregando una nueva película...');
-    mostrarMenu();
-}
-
-function agregarNuevoUsuario() {
-    // Simulamos el proceso de agregación
-    console.log('Agregando un nuevo usuario...');
-    mostrarMenu();
-}
-
-console.log('Inicializando el sistema...');
-
-dbManager.connect()
-    .then(() => {
-        const peliculasCollection = dbManager.getCollection('Peliculas');
-        const usuariosCollection = dbManager.getCollection('Usuarios');
-
-        peliculasManager = new PeliculasManager(peliculasCollection);
-        usuariosManager = new UsuariosManager(usuariosCollection);
-
-        mostrarMenu();
-    })
-    .catch((error) => {
-        console.error('Error al conectar con la base de datos:', error);
-        rl.close();
-    });
-
-*/
+main();
 

@@ -3,19 +3,15 @@ const { MongoClient } = require('mongodb');
 class DatabaseManager {
 
     constructor(uri, databaseName) {
-        this.uri = uri;
         this.databaseName = databaseName;
-        this.client = new MongoClient(uri, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
+        this.client = new MongoClient(uri);
     }
 
     async connect() {
         try {
             await this.client.connect();
             this.db = this.client.db(this.databaseName);
-            console.log('Conexión a MongoDB establecida.');
+            /* console.log('Conexión a MongoDB establecida.'); */
         } catch (error) {
             console.error('Error al conectar a MongoDB:', error);
             throw error;
@@ -29,6 +25,17 @@ class DatabaseManager {
             //console.log('Documento insertado:', result.ops[0]);
         } catch (error) {
             console.error('Error al insertar datos:', error);
+        }
+    }
+
+    async update(collectionName, query, newData) {
+        try {
+            const collection = this.db.collection(collectionName);
+            const result = await collection.updateOne(query, { $set: newData });
+            //console.log('Documento actualizado:', result);
+            return result;
+        } catch (error) {
+            console.error('Error al actualizar datos:', error);
         }
     }
 
